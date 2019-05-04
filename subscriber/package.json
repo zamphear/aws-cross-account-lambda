@@ -1,0 +1,37 @@
+{
+  "name": "scr-services",
+  "version": "1.1.0",
+  "description": "",
+  "main": "handler.js",
+  "scripts": {
+    "deploy:cf": "source ./.env && aws cloudformation update-stack --profile $AWS_PROFILE --region us-west-2 --stack-name $SUBSCRIBER_CORE_STACK_NAME --template-body file://cloudformation/core.yml --capabilities CAPABILITY_NAMED_IAM --parameters ParameterKey=Environment,ParameterValue=dev ParameterKey=MasterAccountId,ParameterValue=$MASTER_ACCOUNT",
+    "deploy:sls": "source ./.env && ./node_modules/.bin/sls deploy --stage=dev --region=us-west-2 --aws-profile=$AWS_PROFILE --master-account=$MASTER_ACCOUNT",
+    "invoke": "source ./.env && ./node_modules/.bin/sls invoke local --stage=dev --region=us-west-2 --aws-profile=$AWS_PROFILE --master-account=$MASTER_ACCOUNT --function",
+    "invoke:debug": "source ./.env && export SLS_DEBUG=* && ./node_modules/.bin/sls invoke local --stage=dev --region=us-west-2 --aws-profile=$AWS_PROFILE --master-account=$MASTER_ACCOUNT --function",
+    "remove:sls": "source ./.env && ./node_modules/.bin/sls remove --stage=dev --region=us-west-2 --aws-profile=$AWS_PROFILE --master-account=$MASTER_ACCOUNT",
+    "start": "source ./.env && AWS_PROFILE=gotdp-dev ./node_modules/.bin/sls offline --stage=dev --region=us-west-2 --dontPrintOutput --master-account=$MASTER_ACCOUNT",
+    "start:debug": "source ./.env && export SLS_DEBUG=* && export AWS_PROFILE=gotdp-dev && node --inspect=5858 ./node_modules/.bin/sls offline -s dev --aws-profile=$AWS_PROFILE --master-account=$MASTER_ACCOUNT",
+    "test": "jest"
+  },
+  "dependencies": {
+    "babel-runtime": "^6.26.0",
+    "serverless": "^1.41.1",
+    "source-map-support": "^0.4.18",
+    "uuid": "^3.3.2"
+  },
+  "devDependencies": {
+    "aws-sdk": "^2.448.0",
+    "babel-core": "^6.26.3",
+    "babel-loader": "^7.1.4",
+    "babel-plugin-source-map-support": "^1.0.0",
+    "babel-plugin-transform-runtime": "^6.23.0",
+    "babel-preset-env": "^1.7.0",
+    "babel-preset-stage-3": "^6.24.1",
+    "eslint": "^5.16.0",
+    "jest": "^21.2.1",
+    "serverless-offline": "^3.25.6",
+    "serverless-webpack": "^5.1.0",
+    "webpack": "^4.16.2",
+    "webpack-node-externals": "^1.6.0"
+  }
+}

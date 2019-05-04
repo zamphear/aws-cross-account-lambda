@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Supporting Resources for the Sample Serverless API stack
+Parameters:
+  Environment:
+    Description: The name of the environment being deployed.
+    Type: String
+    AllowedValues:
+      - dev
+      - test
+      - stage
+      - prod
+  MasterAccountId:
+    Description: The AWS account Id that contains the proxy lambda
+    Type: String
+
+Resources:
+
+  DefaultLambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Sub "scr-${Environment}-${AWS::Region}-DefaultLambdaRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: Allow
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action: "sts:AssumeRole"
+  
+  DefaultLambdaExecutionPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: !Sub "scr-${Environment}-${AWS::Region}-DefaultLambdaExecutionPolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Resource:
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/scr-${Environment}-*:*:*"
+          - Effect: Allow
+            Action:
+              - "sts:AssumeRole"
+            Resource: !Sub "arn:aws:iam::${MasterAccountId}:role/master-${Environment}-${AWS::Region}-DefaultLambdaRole"
+      Roles:
+        - !Ref DefaultLambdaRole
+
+Outputs:
+
+  DefaultLambdaRoleArn:
+    Value: !GetAtt DefaultLambdaRole.Arn
+    Export:
+      Name: !Sub "Subscriber-${Environment}-${AWS::Region}-DefaultLambdaRole-Arn"
+  
