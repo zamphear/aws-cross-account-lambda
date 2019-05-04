@@ -1,0 +1,51 @@
+service: master
+
+plugins:
+  - serverless-offline
+  - serverless-webpack
+
+custom:
+  
+  defaults:
+    stage: dev
+    region: us-west-2
+  
+  lambda:
+    defaultRole:
+      "Fn::ImportValue": "Master-${self:custom.stage}-${self:custom.region}-DefaultLambdaRole-Arn"  
+
+  region: ${opt:region,self:custom.defaults.region}
+
+  serverless-offline:
+    port: 3000
+
+  stackName: ${self:service}-${self:custom.stage}-lambdas
+  stage: ${opt:stage,self:custom.defaults.stage}
+
+  vpc:
+    sg1: ${opt:sg1}
+    sn1: ${opt:sn1}
+    sn2: ${opt:sn2}
+
+  webpack:
+    webpackConfig: webpack.config.js
+    includeModules: true
+
+provider:
+  name: aws
+  stackName: ${self:custom.stackName}
+  runtime: nodejs8.10
+  stage: ${self:custom.stage}
+  region: ${self:custom.region}
+  role: ${self:custom.lambda.defaultRole}
+  timeout: 30
+
+functions:
+  proxy:
+    handler: handler.proxy
+    vpc:
+      securityGroupIds:
+        - ${self:custom.vpc.sg1}
+      subnetIds:
+        - ${self:custom.vpc.sn1}
+        - ${self:custom.vpc.sn2}

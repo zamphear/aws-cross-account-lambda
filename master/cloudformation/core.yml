@@ -1,0 +1,173 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Supporting Resources for the Sample Serverless API stack
+Parameters:
+  Environment:
+    Description: The name of the environment being deployed.
+    Type: String
+    AllowedValues:
+      - dev
+      - test
+      - stage
+      - prod
+  SubscriberAccountId:
+    Description: The AWS Account Id to allow access to the proxy lambda
+    Type: String
+
+Resources:
+  VPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: !Sub "10.0.0.0/16"
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+      Tags:
+      - Key: Name
+        Value: !Sub "10.0.0.0/16"
+  SubnetAPrivate:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !Sub "10.0.16.0/20"
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: "A private"
+      - Key: Reach
+        Value: private
+  SubnetBPrivate:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: !Sub "10.0.48.0/20"
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: "B private"
+      - Key: Reach
+        Value: private
+  RouteTablePrivate: # should be RouteTableAPrivate, but logical id was not changed for backward compatibility
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: Private
+  RouteTableBPrivate:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: "B Private"
+  RouteTableAssociationAPrivate:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref SubnetAPrivate
+      RouteTableId: !Ref RouteTablePrivate
+  RouteTableAssociationBPrivate:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref SubnetBPrivate
+      RouteTableId: !Ref RouteTableBPrivate
+  NetworkAclPrivate:
+    Type: "AWS::EC2::NetworkAcl"
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: Private
+  SubnetNetworkAclAssociationAPrivate:
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    Properties:
+      SubnetId: !Ref SubnetAPrivate
+      NetworkAclId: !Ref NetworkAclPrivate
+  SubnetNetworkAclAssociationBPrivate:
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    Properties:
+      SubnetId: !Ref SubnetBPrivate
+      NetworkAclId: !Ref NetworkAclPrivate
+  NetworkAclEntryInPrivateAllowVPC:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId: !Ref NetworkAclPrivate
+      RuleNumber: 99
+      Protocol: -1
+      RuleAction: allow
+      Egress: false
+      CidrBlock: "0.0.0.0/0"
+  NetworkAclEntryOutPrivateAllowVPC:
+    Type: "AWS::EC2::NetworkAclEntry"
+    Properties:
+      NetworkAclId: !Ref NetworkAclPrivate
+      RuleNumber: 99
+      Protocol: -1
+      RuleAction: allow
+      Egress: true
+      CidrBlock: "0.0.0.0/0"
+  PrivateApiGatewayVPCEndpoint:
+    Type: "AWS::EC2::VPCEndpoint"
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: "com.amazonaws.us-west-2.execute-api"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: 
+        - !Ref SubnetAPrivate
+        - !Ref SubnetBPrivate
+      SecurityGroupIds: 
+        - !GetAtt VPC.DefaultSecurityGroup
+
+  DefaultLambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Sub "master-${Environment}-${AWS::Region}-DefaultLambdaRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action: "sts:AssumeRole"
+          - Effect: Allow
+            Principal:
+              AWS:
+                - !Sub "arn:aws:iam::${SubscriberAccountId}:role/scr-${Environment}-${AWS::Region}-DefaultLambdaRole"
+            Action: "sts:AssumeRole"
+  
+  DefaultLambdaExecutionPolicy:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: !Sub "master-${Environment}-${AWS::Region}-DefaultLambdaExecutionPolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Resource:
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/master-${Environment}-*:*:*"
+          - Effect: Allow
+            Action:
+              - "lambda:InvokeFunction"
+            Resource:
+              - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:master-${Environment}-proxy"
+          - Effect: Allow
+            Action:
+              - ec2:CreateNetworkInterface
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DeleteNetworkInterface
+            Resource: "*"
+      Roles:
+        - !Ref DefaultLambdaRole
+
+Outputs:
+
+  DefaultLambdaRoleArn:
+    Value: !GetAtt DefaultLambdaRole.Arn
+    Export:
+      Name: !Sub "Master-${Environment}-${AWS::Region}-DefaultLambdaRole-Arn"
+  

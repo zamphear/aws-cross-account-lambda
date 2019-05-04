@@ -1,0 +1,44 @@
+service: scr
+
+plugins:
+  - serverless-offline
+  - serverless-webpack
+
+custom:
+  accounts:
+    master: ${opt:master-account}
+  
+  defaults:
+    stage: dev
+    region: us-west-2
+  
+  lambda:
+    defaultRole:
+      "Fn::ImportValue": "Subscriber-${self:custom.stage}-${self:custom.region}-DefaultLambdaRole-Arn"  
+
+  region: ${opt:region,self:custom.defaults.region}
+
+  serverless-offline:
+    port: 3001
+
+  stackName: ${self:service}-${self:custom.stage}-lambdas
+  stage: ${opt:stage,self:custom.defaults.stage}
+  webpack:
+    webpackConfig: webpack.config.js
+    includeModules: true
+
+provider:
+  name: aws
+  stackName: ${self:custom.stackName}
+  runtime: nodejs8.10
+  stage: ${self:custom.stage}
+  region: ${self:custom.region}
+  role: ${self:custom.lambda.defaultRole}
+  timeout: 30
+
+functions:
+  resolver:
+    handler: handler.resolver
+    environment:
+      PROXY_LAMBDA_ARN: "arn:aws:lambda:${self:custom.region}:${self:custom.accounts.master}:function:master-dev-proxy"
+      PROXY_LAMBDA_ROLE_ARN: "arn:aws:iam::${self:custom.accounts.master}:role/master-dev-${self:custom.region}-DefaultLambdaRole"
